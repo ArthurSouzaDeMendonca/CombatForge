@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.usuario import Usuario
 from app.schemas.usuario_schema import UsuarioCreate, UsuarioResponse
 from app.security import gerar_hash_senha
+from app.auth import get_usuario_atual
 
 router = APIRouter(
     prefix="/usuarios",
@@ -58,3 +59,15 @@ def criar_usuario(
         )
 
     return novo_usuario
+
+
+@router.get(
+    "/me",
+    response_model=UsuarioResponse,
+)
+def obter_usuario_atual(
+    usuario: Usuario = Depends(get_usuario_atual),
+):
+    """Retorna os dados do usuário autenticado."""
+
+    return usuario
