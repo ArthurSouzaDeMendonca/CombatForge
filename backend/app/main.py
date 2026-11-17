@@ -3,8 +3,9 @@ from fastapi import Depends, FastAPI
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.routers import usuario_router, autenticacao_router, personagem_router, criatura_router, magia_router, equipamento_router, habilidade_router
-
+from app.routers import ( usuario_router, autenticacao_router, personagem_router, criatura_router,
+                          magia_router, equipamento_router, habilidade_router, campanha_router )
+                        
 
 app = FastAPI(
     title="CombatForge API",
@@ -21,6 +22,7 @@ app.include_router(criatura_router.router)
 app.include_router(magia_router.router)
 app.include_router(equipamento_router.router)
 app.include_router(habilidade_router.router)
+app.include_router(campanha_router.router)
 
 
 @app.get("/")
