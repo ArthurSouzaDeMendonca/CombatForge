@@ -22,6 +22,7 @@ app.include_router(magia_router.router)
 app.include_router(equipamento_router.router)
 app.include_router(habilidade_router.router)
 
+
 @app.get("/")
 def root(db: Session = Depends(get_db)):
     return {"message": "CombatForge API funcionando!"}
