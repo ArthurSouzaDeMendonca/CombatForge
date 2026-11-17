@@ -21,6 +21,12 @@ class Campanha(Base):
         nullable=True,
     )
 
+    codigo_convite: Mapped[str] = mapped_column(
+        String(12),
+        unique=True,
+        nullable=False,
+    )
+
     data_criacao: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),

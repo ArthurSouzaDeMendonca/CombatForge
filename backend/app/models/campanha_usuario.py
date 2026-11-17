@@ -28,10 +28,29 @@ class CampanhaUsuario(Base):
         nullable=False,
     )
 
+    personagem_id: Mapped[int | None] = mapped_column(
+        ForeignKey("personagens.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+
     __table_args__ = (
         CheckConstraint(
             "papel IN ('MESTRE', 'JOGADOR')",
             name="ck_campanha_usuario_papel",
+        ),
+        CheckConstraint(
+            """
+            (
+                papel = 'MESTRE'
+                AND personagem_id IS NULL
+            )
+            OR
+            (
+                papel = 'JOGADOR'
+                AND personagem_id IS NOT NULL
+            )
+            """,
+            name="ck_campanha_usuario_personagem",
         ),
         Index(
             "uq_campanha_usuario_mestre",
