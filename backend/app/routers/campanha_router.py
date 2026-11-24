@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
+from datetime import datetime
 
 from app.auth import get_usuario_atual
 from app.database import get_db
@@ -763,3 +764,84 @@ def atualizar_participante_combate(
     db.refresh(participante)
 
     return participante
+
+
+@router.post(
+    "/{campanha_id}/combates/{combate_id}/avancar-turno",
+    response_model=CombateResponse,
+)
+def avancar_turno_combate(
+    campanha_id: int,
+    combate_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_atual),
+):
+    # Verifica se o usuário é o Mestre e se o combate está ativo.
+    combate = buscar_combate_do_mestre(
+        campanha_id,
+        combate_id,
+        usuario,
+        db,
+    )
+
+    # Busca os participantes na ordem de iniciativa.
+    participantes = db.scalars(
+        select(CombateParticipante)
+        .where(
+            CombateParticipante.combate_id == combate.id,
+        )
+        .order_by(
+            CombateParticipante.iniciativa.desc(),
+            CombateParticipante.ordem_turno,
+        )
+    ).all()
+
+    # Não é possível avançar um combate sem participantes.
+    if not participantes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é possível avançar um combate sem participantes.",
+        )
+
+    # Se ainda existem participantes nesta rodada,
+    # passa para o próximo turno.
+    if combate.ordem_turno_atual < len(participantes):
+        combate.ordem_turno_atual += 1
+
+    # Caso contrário, inicia uma nova rodada.
+    else:
+        combate.rodada_atual += 1
+        combate.ordem_turno_atual = 1
+
+    db.commit()
+    db.refresh(combate)
+
+    return combate
+
+
+@router.post(
+    "/{campanha_id}/combates/{combate_id}/encerrar",
+    response_model=CombateResponse,
+)
+def encerrar_combate(
+    campanha_id: int,
+    combate_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_atual),
+):
+    # Verifica se o usuário é o Mestre e se o combate está ativo.
+    combate = buscar_combate_do_mestre(
+        campanha_id,
+        combate_id,
+        usuario,
+        db,
+    )
+
+    # Atualiza o status e registra o encerramento.
+    combate.status = "ENCERRADO"
+    combate.data_encerramento = datetime.now()
+
+    db.commit()
+    db.refresh(combate)
+
+    return combate
