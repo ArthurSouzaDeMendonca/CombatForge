@@ -755,6 +755,81 @@ def listar_participantes_combate(
         for participante, nome_participante in resultados
     ]
 
+
+@router.delete(
+    "/{campanha_id}/combates/{combate_id}/participantes/{participante_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remover_participante_combate(
+    campanha_id: int,
+    combate_id: int,
+    participante_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_atual),
+):
+    # Verifica se o usuário é o Mestre e se o combate está ativo.
+    combate = buscar_combate_do_mestre(
+        campanha_id,
+        combate_id,
+        usuario,
+        db,
+    )
+
+    # Busca o participante dentro do combate.
+    participante = db.scalar(
+        select(CombateParticipante).where(
+            CombateParticipante.id == participante_id,
+            CombateParticipante.combate_id == combate.id,
+        )
+    )
+
+    if participante is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Participante não encontrado no combate.",
+        )
+
+    # Busca os participantes na ordem atual de iniciativa.
+    participantes = db.scalars(
+        select(CombateParticipante)
+        .where(
+            CombateParticipante.combate_id == combate.id,
+        )
+        .order_by(
+            CombateParticipante.iniciativa.desc(),
+            CombateParticipante.ordem_turno,
+        )
+    ).all()
+
+    # Descobre a posição do participante que será removido.
+    posicao_removida = participantes.index(participante)
+
+    # A posição do turno atual é baseada em 1.
+    posicao_atual = combate.ordem_turno_atual
+
+    # Se o participante removido estava antes do turno atual,
+    # ajusta a posição para não pular o próximo participante.
+    if posicao_removida < posicao_atual - 1:
+        combate.ordem_turno_atual -= 1
+
+    # Se o participante removido era o último do turno atual,
+    # verifica se é necessário iniciar uma nova rodada.
+    elif posicao_removida == posicao_atual - 1:
+        quantidade_restante = len(participantes) - 1
+
+        if quantidade_restante == 0:
+            combate.ordem_turno_atual = 1
+
+        elif combate.ordem_turno_atual > quantidade_restante:
+            combate.rodada_atual += 1
+            combate.ordem_turno_atual = 1
+
+    # Remove somente a participação no combate.
+    db.delete(participante)
+
+    db.commit()
+
+
 @router.put(
     "/{campanha_id}/combates/{combate_id}/participantes/{participante_id}",
     response_model=CombateParticipanteResponse,
