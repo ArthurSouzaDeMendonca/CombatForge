@@ -60,3 +60,19 @@ class CombateParticipanteUpdate(BaseModel):
 
 class CombateDetalhadoResponse(CombateResponse):
     participantes: list[CombateParticipanteListResponse]
+
+
+class CondicaoCombateCreate(BaseModel):
+    nome: str = Field(min_length=1, max_length=80)
+    descricao: str | None = None
+    duracao_rodadas: int | None = Field(default=None, gt=0)
+
+
+class CondicaoCombateResponse(BaseModel):
+    id: int
+    participante_id: int
+    nome: str
+    descricao: str | None
+    duracao_rodadas: int | None
+
+    model_config = ConfigDict(from_attributes=True)

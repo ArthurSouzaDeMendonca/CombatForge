@@ -8,3 +8,4 @@ from app.models.habilidade import Habilidade
 from app.models.criatura import Criatura
 from app.models.combate import Combate
 from app.models.combate_participante import CombateParticipante
+from app.models.condicao_combate import CondicaoCombate
