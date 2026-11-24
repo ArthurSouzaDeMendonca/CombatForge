@@ -11,6 +11,7 @@ class CampanhaCreate(BaseModel):
 class CampanhaResponse(BaseModel):
     id: int
     nome: str
+    nome_mestre: str
     descricao: str | None
     data_criacao: datetime
     codigo_convite: str
