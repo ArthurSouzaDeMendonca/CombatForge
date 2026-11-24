@@ -28,6 +28,7 @@ from app.schemas.campanha_schema import (
 from app.schemas.combate_schema import (
     CombateCreate,
     CombateCriaturaAdicionar,
+    CombateDetalhadoResponse,
     CombateParticipanteListResponse,
     CombateParticipanteResponse,
     CombateParticipanteUpdate,
@@ -845,3 +846,97 @@ def encerrar_combate(
     db.refresh(combate)
 
     return combate
+
+@router.get(
+    "/{campanha_id}/combates/{combate_id}",
+    response_model=CombateDetalhadoResponse,
+)
+def consultar_combate(
+    campanha_id: int,
+    combate_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_atual),
+):
+    # Verifica se o usuário participa da campanha.
+    associacao = db.scalar(
+        select(CampanhaUsuario).where(
+            CampanhaUsuario.campanha_id == campanha_id,
+            CampanhaUsuario.usuario_id == usuario.id,
+        )
+    )
+
+    if associacao is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campanha não encontrada.",
+        )
+
+    # Busca o combate dentro da campanha.
+    combate = db.scalar(
+        select(Combate).where(
+            Combate.id == combate_id,
+            Combate.campanha_id == campanha_id,
+        )
+    )
+
+    if combate is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Combate não encontrado.",
+        )
+
+    # Busca os participantes e seus nomes.
+    consulta = (
+        select(
+            CombateParticipante,
+            func.coalesce(
+                Personagem.nome,
+                Criatura.nome,
+            ).label("nome_participante"),
+        )
+        .outerjoin(
+            Personagem,
+            Personagem.id == CombateParticipante.personagem_id,
+        )
+        .outerjoin(
+            Criatura,
+            Criatura.id == CombateParticipante.criatura_id,
+        )
+        .where(
+            CombateParticipante.combate_id == combate.id,
+        )
+        .order_by(
+            CombateParticipante.iniciativa.desc(),
+            CombateParticipante.ordem_turno,
+        )
+    )
+
+    resultados = db.execute(consulta).all()
+
+    participantes = [
+        CombateParticipanteListResponse(
+            id=participante.id,
+            combate_id=participante.combate_id,
+            personagem_id=participante.personagem_id,
+            criatura_id=participante.criatura_id,
+            nome_participante=nome_participante,
+            pv_maximo=participante.pv_maximo,
+            pv_atual=participante.pv_atual,
+            iniciativa=participante.iniciativa,
+            ordem_turno=participante.ordem_turno,
+        )
+        for participante, nome_participante in resultados
+    ]
+
+    # Retorna os dados do combate junto com os participantes.
+    return CombateDetalhadoResponse(
+        id=combate.id,
+        campanha_id=combate.campanha_id,
+        nome=combate.nome,
+        status=combate.status,
+        rodada_atual=combate.rodada_atual,
+        ordem_turno_atual=combate.ordem_turno_atual,
+        data_criacao=combate.data_criacao,
+        data_encerramento=combate.data_encerramento,
+        participantes=participantes,
+    )

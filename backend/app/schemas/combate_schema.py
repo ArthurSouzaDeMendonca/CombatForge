@@ -57,3 +57,6 @@ class CombateParticipanteListResponse(BaseModel):
 class CombateParticipanteUpdate(BaseModel):
     pv_atual: int = Field(ge=0)
     iniciativa: int
+
+class CombateDetalhadoResponse(CombateResponse):
+    participantes: list[CombateParticipanteListResponse]
