@@ -427,6 +427,45 @@ def listar_participantes(
     ]
 
 
+@router.get(
+    "/{campanha_id}/combates",
+    response_model=list[CombateResponse],
+)
+def listar_combates(
+    campanha_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_atual),
+):
+    # Verifica se o usuário participa da campanha.
+    associacao = db.scalar(
+        select(CampanhaUsuario).where(
+            CampanhaUsuario.campanha_id == campanha_id,
+            CampanhaUsuario.usuario_id == usuario.id,
+        )
+    )
+
+    if associacao is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campanha não encontrada.",
+        )
+
+    # Busca os combates pertencentes à campanha.
+    consulta = (
+        select(Combate)
+        .where(
+            Combate.campanha_id == campanha_id,
+        )
+        .order_by(
+            Combate.data_criacao.desc(),
+        )
+    )
+
+    combates = db.scalars(consulta).all()
+
+    return combates
+
+
 @router.post(
     "/{campanha_id}/combates",
     response_model=CombateResponse,
