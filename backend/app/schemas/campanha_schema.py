@@ -24,3 +24,10 @@ class CampanhaUpdate(BaseModel):
 class CampanhaEntrar(BaseModel):
     codigo_convite: str = Field(min_length=12, max_length=12)
     personagem_id: int = Field(gt=0)
+
+class CampanhaParticipanteResponse(BaseModel):
+    usuario_id: int
+    nome_usuario: str
+    papel: str
+    personagem_id: int | None
+    nome_personagem: str | None

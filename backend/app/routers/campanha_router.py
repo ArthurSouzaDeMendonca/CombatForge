@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models.campanha import Campanha
 from app.models.campanha_usuario import CampanhaUsuario
 from app.models.usuario import Usuario
-from app.schemas.campanha_schema import CampanhaCreate, CampanhaResponse, CampanhaUpdate, CampanhaEntrar
+from app.schemas.campanha_schema import CampanhaCreate, CampanhaResponse, CampanhaUpdate, CampanhaEntrar,  CampanhaParticipanteResponse
 from app.models.personagem import Personagem
 
 
@@ -174,7 +174,6 @@ def entrar_em_campanha(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_usuario_atual),
 ):
-    # Procura a campanha pelo código de convite.
     campanha = db.scalar(
         select(Campanha).where(
             Campanha.codigo_convite == dados.codigo_convite.strip().upper()
@@ -187,7 +186,6 @@ def entrar_em_campanha(
             detail="Código de convite inválido.",
         )
 
-    # Verifica se o usuário já participa da campanha.
     associacao_existente = db.scalar(
         select(CampanhaUsuario).where(
             CampanhaUsuario.campanha_id == campanha.id,
@@ -201,7 +199,6 @@ def entrar_em_campanha(
             detail="Você já participa desta campanha.",
         )
 
-    # Verifica se o personagem pertence ao usuário.
     personagem = db.scalar(
         select(Personagem).where(
             Personagem.id == dados.personagem_id,
@@ -215,7 +212,6 @@ def entrar_em_campanha(
             detail="Personagem não encontrado.",
         )
 
-    # Registra o usuário como jogador da campanha.
     associacao = CampanhaUsuario(
         campanha_id=campanha.id,
         usuario_id=usuario.id,
@@ -235,3 +231,60 @@ def entrar_em_campanha(
         )
 
     return campanha
+
+@router.get(
+    "/{campanha_id}/participantes",
+    response_model=list[CampanhaParticipanteResponse],
+)
+def listar_participantes(
+    campanha_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_atual),
+):
+    associacao = db.scalar(
+        select(CampanhaUsuario).where(
+            CampanhaUsuario.campanha_id == campanha_id,
+            CampanhaUsuario.usuario_id == usuario.id,
+        )
+    )
+
+    if associacao is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campanha não encontrada.",
+        )
+
+    consulta = (
+        select(
+            Usuario.id.label("usuario_id"),
+            Usuario.nome.label("nome_usuario"),
+            CampanhaUsuario.papel,
+            Personagem.id.label("personagem_id"),
+            Personagem.nome.label("nome_personagem"),
+        )
+        .join(
+            CampanhaUsuario,
+            CampanhaUsuario.usuario_id == Usuario.id,
+        )
+        .outerjoin(
+            Personagem,
+            Personagem.id == CampanhaUsuario.personagem_id,
+        )
+        .where(
+            CampanhaUsuario.campanha_id == campanha_id,
+        )
+        .order_by(CampanhaUsuario.papel, Usuario.nome)
+    )
+
+    participantes = db.execute(consulta).all()
+
+    return [
+        CampanhaParticipanteResponse(
+            usuario_id=participante.usuario_id,
+            nome_usuario=participante.nome_usuario,
+            papel=participante.papel,
+            personagem_id=participante.personagem_id,
+            nome_personagem=participante.nome_personagem,
+        )
+        for participante in participantes
+    ]
